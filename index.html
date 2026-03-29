@@ -580,6 +580,8 @@ function renderObSrc(){
   document.getElementById('ob-src-list').innerHTML=obSources.map((s,i)=>`<span class="src-tag">${s}<button onclick="obSources.splice(${i},1);renderObSrc()">×</button></span>`).join('');
 }
 async function obFinish(){
+  const pending=document.getElementById('ob-src-in').value.trim();
+  if(pending&&!obSources.includes(pending))obSources.push(pending);
   if(!obSources.length){showToast('Agrega al menos una fuente de ingreso','err');return;}
   const{error}=await sb.from('profiles').upsert({
     id:USER.id,name:USER.user_metadata?.name||'Usuario',email:USER.email,
