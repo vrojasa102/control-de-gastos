@@ -405,7 +405,7 @@ tbody tr:hover{background:rgba(255,255,255,.018);}
   <div class="fgrid">
     <div class="fg2"><label>Fecha</label><input type="date" id="m-inc-d"></div>
     <div class="fg2"><label>Monto</label><input type="number" id="m-inc-a" placeholder="0"></div>
-    <div class="fg2"><label>Fuente</label><select id="m-inc-s"></select></div>
+    <div class="fg2"><label>Fuente</label><input type="text" id="m-inc-s" placeholder="Ej: Salario, Freelance..." list="src-list"><datalist id="src-list"></datalist></div>
   </div>
   <div class="modal-foot"><button class="btn" onclick="closeModal('income')">Cancelar</button><button class="btn btn-p" onclick="saveIncome()">Guardar</button></div>
 </div></div>
@@ -954,7 +954,8 @@ function openModal(type){
     document.getElementById('m-inc-d').value=todayStr();
     document.getElementById('m-inc-a').value='';
     const src=PROFILE?.sources||['Salario'];
-    document.getElementById('m-inc-s').innerHTML=src.map(s=>`<option>${s}</option>`).join('');
+    document.getElementById('m-inc-s').value='';
+    document.getElementById('src-list').innerHTML=src.map(s=>`<option value="${s}">`).join('');
   }else if(type==='debt'){
     ['m-d-n','m-d-m','m-d-b','m-d-r','m-d-day','m-d-notes'].forEach(id=>document.getElementById(id).value='');
   }else if(type==='sub'){
