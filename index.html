@@ -988,10 +988,13 @@ async function saveTx(){
 async function saveIncome(){
   const date=document.getElementById('m-inc-d').value;
   const amount=parseFloat(document.getElementById('m-inc-a').value);
-  const source=document.getElementById('m-inc-s').value;
-  if(!date||!amount||amount<=0){showToast('Completa los campos','err');return;}
-  const{error}=await sb.from('income').insert({user_id:USER.id,date,amount,source,month:activeMonth,year:PROFILE?.year||2026});
-  if(error){showToast('Error al guardar','err');return;}
+  const source=document.getElementById('m-inc-s').value.trim();
+  if(!date){showToast('Ingresa la fecha','err');return;}
+  if(!amount||amount<=0){showToast('Ingresa el monto','err');return;}
+  if(!source){showToast('Ingresa la fuente','err');return;}
+  if(!USER){showToast('Sesión expirada, recarga la página','err');return;}
+  const{data,error}=await sb.from('income').insert({user_id:USER.id,date,amount,source,month:activeMonth,year:PROFILE?.year||2026}).select();
+  if(error){showToast('Error: '+error.message,'err');console.error(error);return;}
   closeModal('income');renderIncome();renderDash();showToast('Ingreso guardado ✓');
 }
 async function saveDebt(){
