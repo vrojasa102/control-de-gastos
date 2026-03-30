@@ -394,7 +394,12 @@ tbody tr:hover{background:rgba(255,255,255,.018);}
   <div class="fgrid">
     <div class="fg2"><label>Fecha</label><input type="date" id="m-tx-d"></div>
     <div class="fg2"><label>Monto</label><input type="number" id="m-tx-a" placeholder="0"></div>
-    <div class="fg2"><label>Categoría</label><select id="m-tx-c"></select></div>
+    <div class="fg2"><label>Categoría</label>
+      <div style="display:flex;gap:6px;">
+        <select id="m-tx-c" style="flex:1;"></select>
+        <button class="btn" style="padding:8px;flex-shrink:0;" onclick="addCatInline()" title="Nueva categoría">+</button>
+      </div>
+    </div>
     <div class="fg2 full"><label>Descripción</label><input type="text" id="m-tx-desc" placeholder="¿En qué gastaste?"></div>
   </div>
   <div class="modal-foot"><button class="btn" onclick="closeModal('tx')">Cancelar</button><button class="btn btn-p" onclick="saveTx()">Guardar</button></div>
@@ -443,7 +448,12 @@ tbody tr:hover{background:rgba(255,255,255,.018);}
 <div class="overlay" id="modal-bcat"><div class="modal">
   <div class="modal-title">Límite de presupuesto</div>
   <div class="fgrid" style="grid-template-columns:1fr 1fr;">
-    <div class="fg2"><label>Categoría</label><select id="m-bc-c"></select></div>
+    <div class="fg2"><label>Categoría</label>
+      <div style="display:flex;gap:6px;">
+        <select id="m-bc-c" style="flex:1;"></select>
+        <button class="btn" style="padding:8px;flex-shrink:0;" onclick="addCatInline()" title="Nueva categoría">+</button>
+      </div>
+    </div>
     <div class="fg2"><label>Límite mensual</label><input type="number" id="m-bc-l" placeholder="0"></div>
   </div>
   <div class="modal-foot"><button class="btn" onclick="closeModal('bcat')">Cancelar</button><button class="btn btn-p" onclick="saveBcat()">Guardar</button></div>
@@ -605,9 +615,14 @@ async function obFinish(){
 
 // ══ INIT ══
 async function loadProfile(){
-  const{data}=await sb.from('profiles').select('*').eq('id',USER.id).single();
-  PROFILE=data;
-  if(PROFILE?.cats)CATS=PROFILE.cats;
+  const{data,error}=await sb.from('profiles').select('*').eq('id',USER.id).single();
+  if(error&&error.code!=='PGRST116'){console.error('Profile error:',error);}
+  PROFILE=data||null;
+  if(PROFILE?.cats&&Array.isArray(PROFILE.cats)&&PROFILE.cats.length>0){
+    CATS=PROFILE.cats;
+  } else {
+    CATS=[...DEF_CATS];
+  }
 }
 
 async function initApp(){
@@ -618,10 +633,19 @@ async function initApp(){
 
 // ══ SUPABASE LISTENER ══
 sb.auth.onAuthStateChange(async(event,session)=>{
+  if(event==='SIGNED_OUT'||!session){
+    USER=null;PROFILE=null;
+    document.getElementById('app').style.display='none';
+    document.getElementById('onboarding').style.display='none';
+    document.getElementById('auth-screen').style.display='flex';
+    return;
+  }
   if(session?.user){
     USER=session.user;
     await loadProfile();
     document.getElementById('auth-screen').style.display='none';
+    document.getElementById('onboarding').style.display='none';
+    document.getElementById('app').style.display='none';
     if(!PROFILE){
       document.getElementById('onboarding').style.display='flex';
     } else {
@@ -716,7 +740,7 @@ async function renderDash(){
 async function renderTx(){
   document.getElementById('tx-sub').textContent=mName()+' '+(PROFILE?.year||2026);
   const cf=document.getElementById('tx-cat-f');
-  if(cf.options.length<=1){CATS.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;cf.appendChild(o);});}
+  cf.innerHTML='<option value="">Todas las categorías</option>'+CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
   let q=`user_id=eq.${USER.id}&month=eq.${activeMonth}&order=date.desc`;
   const{data:txs}=await sb.from('transactions').select('*').eq('user_id',USER.id).eq('month',activeMonth).order('date',{ascending:false});
   const f=cf.value,sq=document.getElementById('tx-q').value.toLowerCase();
@@ -963,6 +987,7 @@ function openModal(type){
     document.getElementById('m-tx-a').value='';
     document.getElementById('m-tx-desc').value='';
     document.getElementById('m-tx-c').innerHTML=CATS.map(c=>`<option>${c}</option>`).join('');
+    document.getElementById('m-bc-c').innerHTML=CATS.map(c=>`<option>${c}</option>`).join('');
   }else if(type==='income'){
     document.getElementById('m-inc-d').value=todayStr();
     document.getElementById('m-inc-a').value='';
@@ -985,6 +1010,32 @@ function openModal(type){
   document.getElementById('modal-'+type).classList.add('open');
   setTimeout(()=>{const f=document.querySelector('#modal-'+type+' input');if(f)f.focus();},60);
 }
+async function addCatInline(){
+  const name=prompt('Nombre de la nueva categoría:');
+  if(!name||!name.trim())return;
+  const cat=name.trim();
+  if(CATS.includes(cat)){showToast('Ya existe esta categoría','err');return;}
+  CATS.push(cat);
+  // Save to profile
+  await sb.from('profiles').update({cats:CATS}).eq('id',USER.id);
+  // Update all category selects
+  const selectors=['m-tx-c','m-bc-c'];
+  selectors.forEach(id=>{
+    const sel=document.getElementById(id);
+    if(sel){
+      const current=sel.value;
+      sel.innerHTML=CATS.map(c=>`<option ${c===cat?'selected':''}${c===current&&cat!==cat?'selected':''}>${c}</option>`).join('');
+      sel.value=cat;
+    }
+  });
+  // Also update tx filter
+  const txFilter=document.getElementById('tx-cat-f');
+  if(txFilter){
+    txFilter.innerHTML='<option value="">Todas las categorías</option>'+CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  }
+  showToast('Categoría "'+cat+'" agregada ✓');
+}
+
 function closeModal(type){document.getElementById('modal-'+type).classList.remove('open');}
 document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));
 
@@ -1032,7 +1083,12 @@ async function saveSub(){
 async function saveBcat(){
   const category=document.getElementById('m-bc-c').value;
   const limit_amount=parseFloat(document.getElementById('m-bc-l').value)||0;
-  await sb.from('budget').upsert({user_id:USER.id,category,limit_amount,month:activeMonth,year:PROFILE?.year||2026},{onConflict:'user_id,category,month,year'});
+  if(!category){showToast('Selecciona una categoría','err');return;}
+  if(!USER){showToast('Sesión expirada','err');return;}
+  // Delete existing and insert new to avoid conflict issues
+  await sb.from('budget').delete().eq('user_id',USER.id).eq('category',category).eq('month',activeMonth);
+  const{error}=await sb.from('budget').insert({user_id:USER.id,category,limit_amount,month:activeMonth,year:PROFILE?.year||2026});
+  if(error){showToast('Error: '+error.message,'err');console.error(error);return;}
   closeModal('bcat');renderBudget();showToast('Límite guardado ✓');
 }
 async function saveSaving(){
