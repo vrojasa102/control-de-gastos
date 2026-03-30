@@ -476,7 +476,15 @@ tbody tr:hover{background:rgba(255,255,255,.018);}
 // ══ SUPABASE ══
 const SUPABASE_URL='https://qdurcluekiadjgrmyyyr.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkdXJjbHVla2lhZGpncm15eXlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MjEwOTcsImV4cCI6MjA5MDM5NzA5N30.tL03b922_980icB8wbClHpcb7PoW88G-z3QCuL75sYw';
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
+  auth:{
+    persistSession:true,
+    storageKey:'cdg-auth',
+    storage:window.localStorage,
+    autoRefreshToken:true,
+    detectSessionInUrl:true
+  }
+});
 
 // ══ CONSTANTS ══
 const COUNTRIES=[
