@@ -640,26 +640,31 @@ async function renderDash(){
   document.getElementById('d-sub').textContent='Resumen mensual · '+ctry().currency;
   document.getElementById('d-metrics').innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
 
-  const[{data:txs},{data:incs},{data:debts},{data:subs}]=await Promise.all([
+  if(!USER){return;}
+  const[txsRes,incsRes,debtsRes,subsRes]=await Promise.all([
     sb.from('transactions').select('*').eq('user_id',USER.id).eq('month',activeMonth),
     sb.from('income').select('*').eq('user_id',USER.id).eq('month',activeMonth),
     sb.from('debt').select('*').eq('user_id',USER.id),
     sb.from('subscriptions').select('*').eq('user_id',USER.id),
   ]);
+  const txs=txsRes.data||[];
+  const incs=incsRes.data||[];
+  const debts=debtsRes.data||[];
+  const subs=subsRes.data||[];
 
-  const totalInc=(incs||[]).reduce((s,i)=>s+i.amount,0);
-  const totalExp=(txs||[]).reduce((s,t)=>s+t.amount,0);
-  const totalDebt=(debts||[]).reduce((s,d)=>s+d.monthly,0);
-  const totalSubs=(subs||[]).reduce((s,sub)=>s+subMonthlyCost(sub),0);
+  const totalInc=incs.reduce((s,i)=>s+i.amount,0);
+  const totalExp=txs.reduce((s,t)=>s+t.amount,0);
+  const totalDebt=debts.reduce((s,d)=>s+d.monthly,0);
+  const totalSubs=subs.reduce((s,sub)=>s+subMonthlyCost(sub),0);
   const balance=totalInc-totalExp-totalDebt-totalSubs;
 
   document.getElementById('d-metrics').innerHTML=`
-    <div class="metric"><div class="ml">Ingresos</div><div class="mv g">${fmt(totalInc)}</div><div class="msub">${(incs||[]).length} registros</div></div>
-    <div class="metric"><div class="ml">Gastos</div><div class="mv b">${fmt(totalExp)}</div><div class="msub">${(txs||[]).length} transacciones</div></div>
+    <div class="metric"><div class="ml">Ingresos</div><div class="mv g">${fmt(totalInc)}</div><div class="msub">${incs.length} registros</div></div>
+    <div class="metric"><div class="ml">Gastos</div><div class="mv b">${fmt(totalExp)}</div><div class="msub">${txs.length} transacciones</div></div>
     <div class="metric"><div class="ml">Compromisos fijos</div><div class="mv r">${fmt(totalDebt+totalSubs)}</div><div class="msub">deudas + suscripciones</div></div>
     <div class="metric"><div class="ml">Disponible</div><div class="mv ${balance>=0?'g':'r'}">${fmt(balance)}</div><div class="msub">después de todo</div></div>`;
 
-  const catMap={};(txs||[]).forEach(t=>{catMap[t.category]=(catMap[t.category]||0)+t.amount;});
+  const catMap={};txs.forEach(t=>{catMap[t.category]=(catMap[t.category]||0)+t.amount;});
   const sorted=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
   const maxV=Math.max(...Object.values(catMap),1);
   document.getElementById('d-exp-bars').innerHTML=sorted.length?sorted.slice(0,6).map(([k,v])=>`
@@ -685,14 +690,14 @@ async function renderDash(){
   // Upcoming
   const today=new Date().getDate();
   const upcoming=[
-    ...(debts||[]).filter(d=>d.day).map(d=>({name:d.name,amount:d.monthly,daysLeft:d.day>=today?d.day-today:d.day+30-today})),
-    ...(subs||[]).filter(s=>s.day&&s.reminder).map(s=>({name:s.name,amount:subMonthlyCost(s),daysLeft:s.day>=today?s.day-today:s.day+30-today})),
+    ...debts.filter(d=>d.day).map(d=>({name:d.name,amount:d.monthly,daysLeft:d.day>=today?d.day-today:d.day+30-today})),
+    ...subs.filter(s=>s.day&&s.reminder).map(s=>({name:s.name,amount:subMonthlyCost(s),daysLeft:s.day>=today?s.day-today:s.day+30-today})),
   ].sort((a,b)=>a.daysLeft-b.daysLeft).slice(0,5);
   document.getElementById('d-upcoming').innerHTML=upcoming.length?upcoming.map(p=>`
     <div class="lrow"><div class="lrow-l"><div class="lrow-name">${p.name}</div><div class="lrow-sub">${p.daysLeft===0?'Hoy':p.daysLeft===1?'Mañana':'En '+p.daysLeft+' días'}</div></div>
     <div style="font-family:var(--mono);font-size:13px;color:${p.daysLeft<=3?'var(--red)':'var(--amber)'}">${fmt(p.amount)}</div></div>`).join(''):'<div class="empty">Sin pagos próximos</div>';
 
-  const recent=[...(txs||[])].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
+  const recent=[...txs].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('d-recent').innerHTML=recent.length?recent.map(t=>`
     <tr><td style="font-family:var(--mono);color:var(--muted);font-size:11px;">${t.date?.slice(5)||''}</td><td>${t.description}</td>
     <td><span class="badge" style="background:${catColorByName(t.category)}25;color:${catColorByName(t.category)}">${t.category}</span></td>
@@ -707,7 +712,7 @@ async function renderTx(){
   let q=`user_id=eq.${USER.id}&month=eq.${activeMonth}&order=date.desc`;
   const{data:txs}=await sb.from('transactions').select('*').eq('user_id',USER.id).eq('month',activeMonth).order('date',{ascending:false});
   const f=cf.value,sq=document.getElementById('tx-q').value.toLowerCase();
-  let rows=(txs||[]);
+  let rows=txs;
   if(f)rows=rows.filter(t=>t.category===f);
   if(sq)rows=rows.filter(t=>(t.description||'').toLowerCase().includes(sq)||(t.category||'').toLowerCase().includes(sq));
   document.getElementById('tx-body').innerHTML=rows.length?rows.map(t=>`
@@ -725,7 +730,7 @@ async function renderBudget(){
     sb.from('transactions').select('*').eq('user_id',USER.id).eq('month',activeMonth),
     sb.from('budget').select('*').eq('user_id',USER.id).eq('month',activeMonth),
   ]);
-  const catMap={};(txs||[]).forEach(t=>{catMap[t.category]=(catMap[t.category]||0)+t.amount;});
+  const catMap={};txs.forEach(t=>{catMap[t.category]=(catMap[t.category]||0)+t.amount;});
   const budMap={};(budgets||[]).forEach(b=>{budMap[b.category]=b.limit_amount;});
   const allCats=Array.from(new Set([...CATS,...Object.keys(budMap)]));
   document.getElementById('bud-content').innerHTML=allCats.map(cat=>{
@@ -744,15 +749,15 @@ async function renderBudget(){
 // ══ DEBT ══
 async function renderDebt(){
   const{data:debts}=await sb.from('debt').select('*').eq('user_id',USER.id);
-  const totalM=(debts||[]).reduce((s,d)=>s+d.monthly,0);
-  const totalB=(debts||[]).reduce((s,d)=>s+(d.balance||0),0);
+  const totalM=debts.reduce((s,d)=>s+d.monthly,0);
+  const totalB=debts.reduce((s,d)=>s+(d.balance||0),0);
   document.getElementById('debt-metrics').innerHTML=`
     <div class="metric"><div class="ml">Pago mensual</div><div class="mv r">${fmt(totalM)}</div></div>
     <div class="metric"><div class="ml">Saldo total</div><div class="mv a">${fmt(totalB)}</div></div>
-    <div class="metric"><div class="ml">Préstamos</div><div class="mv b">${(debts||[]).length}</div></div>
+    <div class="metric"><div class="ml">Préstamos</div><div class="mv b">${debts.length}</div></div>
     <div class="metric"><div class="ml">% del ingreso</div><div class="mv p">—</div></div>`;
   const dcolors=['#f87171','#fbbf24','#a78bfa','#60a5fa','#2dd4bf','#f472b6','#4ade80'];
-  document.getElementById('debt-list').innerHTML=(debts||[]).length?(debts||[]).map((d,i)=>`
+  document.getElementById('debt-list').innerHTML=debts.length?debts.map((d,i)=>`
     <div class="lrow">
       <div class="lrow-l"><div class="lrow-name">${d.name}</div>
       <div class="lrow-sub">${d.balance?'Saldo: '+fmt(d.balance)+' · ':''}${d.rate?d.rate+'% anual · ':''}${d.day?'Día '+d.day:''}</div>
@@ -766,22 +771,22 @@ async function delDebt(id){await sb.from('debt').delete().eq('id',id);renderDebt
 // ══ SUBSCRIPTIONS ══
 async function renderSubs(){
   const{data:subs}=await sb.from('subscriptions').select('*').eq('user_id',USER.id);
-  const totalM=(subs||[]).reduce((s,sub)=>s+subMonthlyCost(sub),0);
-  document.getElementById('sub-ps').textContent=(subs||[]).length+' suscripciones';
+  const totalM=subs.reduce((s,sub)=>s+subMonthlyCost(sub),0);
+  document.getElementById('sub-ps').textContent=subs.length+' suscripciones';
   document.getElementById('sub-metrics').innerHTML=`
     <div class="metric"><div class="ml">Costo mensual</div><div class="mv r">${fmt(totalM)}</div></div>
     <div class="metric"><div class="ml">Costo anual</div><div class="mv a">${fmt(totalM*12)}</div></div>
-    <div class="metric"><div class="ml">Suscripciones</div><div class="mv b">${(subs||[]).length}</div></div>
-    <div class="metric"><div class="ml">Con recordatorio</div><div class="mv g">${(subs||[]).filter(s=>s.reminder).length}</div></div>`;
+    <div class="metric"><div class="ml">Suscripciones</div><div class="mv b">${subs.length}</div></div>
+    <div class="metric"><div class="ml">Con recordatorio</div><div class="mv g">${subs.filter(s=>s.reminder).length}</div></div>`;
   const icons={'Entretenimiento':'🎬','Trabajo':'💼','Salud':'💊','Educación':'📚','Hogar':'🏠','Otros':'📦'};
-  document.getElementById('sub-list').innerHTML=(subs||[]).length?(subs||[]).map(s=>`
+  document.getElementById('sub-list').innerHTML=subs.length?subs.map(s=>`
     <div class="lrow">
       <div style="width:34px;height:34px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;margin-right:10px;">${icons[s.category]||'📦'}</div>
       <div class="lrow-l"><div class="lrow-name">${s.name}</div><div class="lrow-sub">${s.freq==='monthly'?'Mensual':s.freq==='yearly'?'Anual':'Semanal'}${s.day?' · Día '+s.day:''} · ${s.currency==='USD'?'USD':'Local'}${s.reminder?' · 🔔':''}</div></div>
       <div class="lrow-r"><div style="text-align:right;"><div style="font-family:var(--mono);font-size:13px;">${s.currency==='USD'?'$'+s.amount.toFixed(2):fmt(s.amount)}</div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);">${fmt(subMonthlyCost(s))}/mes</div></div>
       <button class="btn-ghost" onclick="delSub('${s.id}')">×</button></div>
     </div>`).join(''):'<div class="empty">Sin suscripciones</div>';
-  const catMap={};(subs||[]).forEach(s=>{catMap[s.category]=(catMap[s.category]||0)+subMonthlyCost(s);});
+  const catMap={};subs.forEach(s=>{catMap[s.category]=(catMap[s.category]||0)+subMonthlyCost(s);});
   const maxS=Math.max(...Object.values(catMap),1);
   document.getElementById('sub-bars').innerHTML=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
     <div class="cbar"><div class="cbar-name">${icons[k]||'📦'} ${k}</div><div class="cbar-bg"><div class="cbar-fill" style="width:${Math.round(v/maxS*100)}%;background:var(--purple);"></div></div><div class="cbar-val">${fmt(v)}</div></div>`).join('')||'<div class="empty">Sin datos</div>';
@@ -800,8 +805,8 @@ async function renderReminders(){
   const daysInMonth=new Date(year,activeMonth,0).getDate();
   const firstDay=(new Date(year,activeMonth-1,1).getDay()+6)%7;
   const paysByDay={};
-  (debts||[]).forEach(d=>{if(d.day)paysByDay[d.day]=(paysByDay[d.day]||[]).concat([{name:d.name,amt:d.monthly,color:'#f87171'}]);});
-  (subs||[]).forEach(s=>{if(s.day&&s.reminder)paysByDay[s.day]=(paysByDay[s.day]||[]).concat([{name:s.name,amt:subMonthlyCost(s),color:'#a78bfa'}]);});
+  debts.forEach(d=>{if(d.day)paysByDay[d.day]=(paysByDay[d.day]||[]).concat([{name:d.name,amt:d.monthly,color:'#f87171'}]);});
+  subs.forEach(s=>{if(s.day&&s.reminder)paysByDay[s.day]=(paysByDay[s.day]||[]).concat([{name:s.name,amt:subMonthlyCost(s),color:'#a78bfa'}]);});
   document.getElementById('cal-heads').innerHTML=['L','M','M','J','V','S','D'].map(d=>`<div class="cal-head">${d}</div>`).join('');
   let cells='';
   for(let i=0;i<firstDay;i++)cells+=`<div class="cal-day om"></div>`;
@@ -812,8 +817,8 @@ async function renderReminders(){
   }
   document.getElementById('cal-grid').innerHTML=cells;
   const allPayments=[
-    ...(debts||[]).filter(d=>d.day).map(d=>({name:d.name,amount:d.monthly,day:d.day,type:'Deuda',color:'#f87171',id:d.id})),
-    ...(subs||[]).filter(s=>s.day).map(s=>({name:s.name,amount:subMonthlyCost(s),day:s.day,type:'Suscripción',color:'#a78bfa',id:s.id})),
+    ...debts.filter(d=>d.day).map(d=>({name:d.name,amount:d.monthly,day:d.day,type:'Deuda',color:'#f87171',id:d.id})),
+    ...subs.filter(s=>s.day).map(s=>({name:s.name,amount:subMonthlyCost(s),day:s.day,type:'Suscripción',color:'#a78bfa',id:s.id})),
   ];
   const upcoming=allPayments.filter(p=>p.day).map(p=>({...p,daysLeft:p.day>=todayD?p.day-todayD:p.day+daysInMonth-todayD})).sort((a,b)=>a.daysLeft-b.daysLeft);
   document.getElementById('rem-metrics').innerHTML=`
@@ -831,7 +836,7 @@ async function renderReminders(){
 async function renderCalc(){
   const{data:debts}=await sb.from('debt').select('*').eq('user_id',USER.id);
   const sel=document.getElementById('c-debt-sel');
-  sel.innerHTML='<option value="">— Seleccionar —</option>'+(debts||[]).filter(d=>d.balance&&d.rate).map(d=>`<option value="${d.id}" data-bal="${d.balance}" data-rate="${d.rate}" data-pay="${d.monthly}">${d.name}</option>`).join('');
+  sel.innerHTML='<option value="">— Seleccionar —</option>'+debts.filter(d=>d.balance&&d.rate).map(d=>`<option value="${d.id}" data-bal="${d.balance}" data-rate="${d.rate}" data-pay="${d.monthly}">${d.name}</option>`).join('');
 }
 function loadDebtCalc(){
   const sel=document.getElementById('c-debt-sel');
@@ -882,14 +887,14 @@ function calcInterest(){
 async function renderIncome(){
   document.getElementById('inc-sub').textContent=mName()+' '+(PROFILE?.year||2026);
   const{data:incs}=await sb.from('income').select('*').eq('user_id',USER.id).eq('month',activeMonth).order('date',{ascending:false});
-  const total=(incs||[]).reduce((s,i)=>s+i.amount,0);
-  const byS={};(incs||[]).forEach(i=>{byS[i.source]=(byS[i.source]||0)+i.amount;});
+  const total=incs.reduce((s,i)=>s+i.amount,0);
+  const byS={};incs.forEach(i=>{byS[i.source]=(byS[i.source]||0)+i.amount;});
   document.getElementById('inc-metrics').innerHTML=`
     <div class="metric"><div class="ml">Total</div><div class="mv g">${fmt(total)}</div></div>
     <div class="metric"><div class="ml">Fuentes</div><div class="mv b">${Object.keys(byS).length}</div></div>
-    <div class="metric"><div class="ml">Registros</div><div class="mv a">${(incs||[]).length}</div></div>
+    <div class="metric"><div class="ml">Registros</div><div class="mv a">${incs.length}</div></div>
     <div class="metric"><div class="ml">Promedio</div><div class="mv">${Object.keys(byS).length?fmt(total/Object.keys(byS).length):fmt(0)}</div></div>`;
-  document.getElementById('inc-body').innerHTML=(incs||[]).length?(incs||[]).map(i=>`
+  document.getElementById('inc-body').innerHTML=incs.length?incs.map(i=>`
     <tr><td style="font-family:var(--mono);color:var(--muted);font-size:11px;">${i.date}</td><td>${i.source}</td>
     <td style="text-align:right;font-family:var(--mono);color:var(--accent)">${fmt(i.amount)}</td>
     <td><button class="btn-ghost" onclick="delInc('${i.id}')">×</button></td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">Sin ingresos este mes</div></td></tr>';
@@ -982,7 +987,7 @@ async function saveTx(){
   const description=document.getElementById('m-tx-desc').value.trim()||category;
   if(!date||!amount||amount<=0){showToast('Completa los campos','err');return;}
   const{error}=await sb.from('transactions').insert({user_id:USER.id,date,amount,category,description,month:activeMonth,year:PROFILE?.year||2026});
-  if(error){showToast('Error al guardar','err');return;}
+  if(error){showToast('Error: '+error.message,'err');console.error(error);return;}
   closeModal('tx');renderTx();renderDash();showToast('Gasto guardado ✓');
 }
 async function saveIncome(){
@@ -1000,17 +1005,20 @@ async function saveIncome(){
 async function saveDebt(){
   const name=document.getElementById('m-d-n').value.trim();
   const monthly=parseFloat(document.getElementById('m-d-m').value)||0;
-  if(!name||monthly<=0){showToast('Nombre y pago mensual requeridos','err');return;}
+  if(!name){showToast('Ingresa el nombre de la deuda','err');return;}
+  if(monthly<=0){showToast('Ingresa el pago mensual','err');return;}
+  if(!USER){showToast('Sesión expirada, recarga la página','err');return;}
   const{error}=await sb.from('debt').insert({user_id:USER.id,name,monthly,balance:parseFloat(document.getElementById('m-d-b').value)||0,rate:parseFloat(document.getElementById('m-d-r').value)||0,day:parseInt(document.getElementById('m-d-day').value)||null,notes:document.getElementById('m-d-notes').value});
-  if(error){showToast('Error al guardar','err');return;}
+  if(error){showToast('Error: '+error.message,'err');console.error(error);return;}
   closeModal('debt');renderDebt();renderDash();showToast('Deuda agregada ✓');
 }
 async function saveSub(){
   const name=document.getElementById('m-s-n').value.trim();
   const amount=parseFloat(document.getElementById('m-s-a').value)||0;
   if(!name||amount<=0){showToast('Nombre y monto requeridos','err');return;}
+  if(!USER){showToast('Sesión expirada, recarga la página','err');return;}
   const{error}=await sb.from('subscriptions').insert({user_id:USER.id,name,amount,currency:document.getElementById('m-s-curr').value,freq:document.getElementById('m-s-freq').value,day:parseInt(document.getElementById('m-s-day').value)||null,category:document.getElementById('m-s-cat').value,reminder:document.getElementById('m-s-rem').checked});
-  if(error){showToast('Error al guardar','err');return;}
+  if(error){showToast('Error: '+error.message,'err');console.error(error);return;}
   closeModal('sub');renderSubs();showToast('Suscripción agregada ✓');
 }
 async function saveBcat(){
@@ -1022,13 +1030,15 @@ async function saveBcat(){
 async function saveSaving(){
   const name=document.getElementById('m-sv-n').value.trim();
   if(!name){showToast('Ingresa un nombre','err');return;}
-  await sb.from('savings').insert({user_id:USER.id,name,saved:parseFloat(document.getElementById('m-sv-a').value)||0,goal:parseFloat(document.getElementById('m-sv-g').value)||0});
+  const{error:savErr}=await sb.from('savings').insert({user_id:USER.id,name,saved:parseFloat(document.getElementById('m-sv-a').value)||0,goal:parseFloat(document.getElementById('m-sv-g').value)||0});
+  if(savErr){showToast('Error: '+savErr.message,'err');return;}
   closeModal('saving');renderSavings();showToast('Fondo agregado ✓');
 }
 async function saveInvest(){
   const name=document.getElementById('m-iv-n').value.trim();
   if(!name){showToast('Ingresa un nombre','err');return;}
-  await sb.from('investments').insert({user_id:USER.id,name,ticker:document.getElementById('m-iv-ticker').value.trim().toUpperCase(),type:document.getElementById('m-iv-type').value,shares:parseFloat(document.getElementById('m-iv-shares').value)||1,buy_price:parseFloat(document.getElementById('m-iv-buy').value)||0,current_price:parseFloat(document.getElementById('m-iv-cur').value)||0});
+  const{error:invErr}=await sb.from('investments').insert({user_id:USER.id,name,ticker:document.getElementById('m-iv-ticker').value.trim().toUpperCase(),type:document.getElementById('m-iv-type').value,shares:parseFloat(document.getElementById('m-iv-shares').value)||1,buy_price:parseFloat(document.getElementById('m-iv-buy').value)||0,current_price:parseFloat(document.getElementById('m-iv-cur').value)||0});
+  if(invErr){showToast('Error: '+invErr.message,'err');return;}
   closeModal('invest');renderInvestments();showToast('Inversión agregada ✓');
 }
 
