@@ -59,6 +59,9 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:1px;backgroun
 .app{display:flex;min-height:100vh;}
 .sidebar{width:230px;min-height:100vh;border-right:1px solid var(--border);padding:24px 0;position:fixed;top:0;left:0;background:var(--bg);z-index:50;display:flex;flex-direction:column;}
 .main{margin-left:230px;flex:1;padding:36px 40px;max-width:1160px;}
+.topbar{position:fixed;top:0;right:0;z-index:100;padding:10px 24px;display:flex;align-items:center;gap:8px;}
+.lang-btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;padding:4px 10px;border-radius:6px;cursor:pointer;border:1px solid var(--border2);background:none;color:var(--muted);transition:all .15s;}
+.lang-btn.active{background:var(--accent);color:#0d0f12;border-color:var(--accent);font-weight:700;}
 .logo{padding:0 22px 24px;border-bottom:1px solid var(--border);}
 .logo-eye{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--accent);}
 .logo-name{font-size:19px;font-weight:800;letter-spacing:-.02em;margin-top:2px;}
@@ -87,7 +90,7 @@ nav{padding:16px 0;flex:1;overflow-y:auto;}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-bottom:22px;}
 .metric{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px 17px;}
 .ml{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
-.mv{font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1;}
+.mv{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1;}
 .mv.g{color:var(--accent);}.mv.r{color:var(--red);}.mv.a{color:var(--amber);}.mv.b{color:var(--blue);}.mv.p{color:var(--purple);}
 .msub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;}
 
@@ -245,6 +248,7 @@ tbody tr:hover{background:rgba(255,255,255,.018);}
 
 <!-- APP -->
 <div class="app" id="app" style="display:none;">
+<div class="topbar"><button class="lang-btn active" onclick="setLang('es')" id="btn-es">ES</button><button class="lang-btn" onclick="setLang('en')" id="btn-en">EN</button></div>
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-eye">Finanzas</div>
@@ -641,7 +645,82 @@ async function loadProfile(){
 async function initApp(){
   document.getElementById('sb-user').textContent=PROFILE?.name||USER.email;
   document.getElementById('month-sel').value=activeMonth;
-  renderDash();
+  if(PROFILE?.lang&&PROFILE.lang!==LANG){setLang(PROFILE.lang);} else {renderDash();}
+}
+
+
+// ══ I18N ══
+let LANG='es';
+const T={
+  es:{
+    dashboard:'Dashboard',nav_transactions:'Transacciones',nav_budget:'Presupuesto',
+    nav_debt:'Deudas',nav_subs:'Suscripciones',nav_reminders:'Recordatorios',
+    nav_calculator:'Calculadora',nav_income:'Ingresos',nav_savings:'Ahorros',
+    nav_investments:'Inversiones',nav_principal:'Principal',nav_compromisos:'Compromisos',
+    nav_dinero:'Dinero',month_label:'Mes activo',logout:'Cerrar sesión',
+    metric_income:'Ingresos',metric_expenses:'Gastos',metric_fixed:'Compromisos fijos',
+    metric_available:'Disponible',metric_income_sub:'registros',metric_expenses_sub:'transacciones',
+    metric_fixed_sub:'deudas + suscripciones',metric_available_sub:'saldo acumulado',
+    upcoming:'Próximos pagos',recent_tx:'Últimas transacciones',
+    exp_by_cat:'Gastos por categoría',annual_balance:'Balance anual',
+    no_expenses:'Sin gastos este mes',no_tx:'Sin transacciones',no_upcoming:'Sin pagos próximos',
+    today:'Hoy',tomorrow:'Mañana',in_days:'En',days:'días',
+    months:['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Setiembre','Octubre','Noviembre','Diciembre'],
+    monthly_sub:'resumen mensual',
+  },
+  en:{
+    dashboard:'Dashboard',nav_transactions:'Transactions',nav_budget:'Budget',
+    nav_debt:'Debts',nav_subs:'Subscriptions',nav_reminders:'Reminders',
+    nav_calculator:'Calculator',nav_income:'Income',nav_savings:'Savings',
+    nav_investments:'Investments',nav_principal:'Main',nav_compromisos:'Commitments',
+    nav_dinero:'Money',month_label:'Active month',logout:'Sign out',
+    metric_income:'Income',metric_expenses:'Expenses',metric_fixed:'Fixed commitments',
+    metric_available:'Available',metric_income_sub:'records',metric_expenses_sub:'transactions',
+    metric_fixed_sub:'debts + subscriptions',metric_available_sub:'accumulated balance',
+    upcoming:'Upcoming payments',recent_tx:'Recent transactions',
+    exp_by_cat:'Expenses by category',annual_balance:'Annual balance',
+    no_expenses:'No expenses this month',no_tx:'No transactions',no_upcoming:'No upcoming payments',
+    today:'Today',tomorrow:'Tomorrow',in_days:'In',days:'days',
+    months:['January','February','March','April','May','June','July','August','September','October','November','December'],
+    monthly_sub:'monthly summary',
+  }
+};
+const t=k=>T[LANG][k]||T['es'][k]||k;
+
+function setLang(lang){
+  LANG=lang;
+  document.getElementById('btn-es').classList.toggle('active',lang==='es');
+  document.getElementById('btn-en').classList.toggle('active',lang==='en');
+  // Update nav
+  document.querySelector('.ni:nth-child(2) span').textContent=t('dashboard');
+  // Update sidebar sections
+  const secs=document.querySelectorAll('.nav-sec');
+  if(secs[0])secs[0].textContent=t('nav_principal');
+  if(secs[1])secs[1].textContent=t('nav_compromisos');
+  if(secs[2])secs[2].textContent=t('nav_dinero');
+  // Update month selector label
+  const sbLabel=document.querySelector('.sb-label');
+  if(sbLabel)sbLabel.textContent=t('month_label');
+  // Update logout
+  document.querySelector('.logout-btn').textContent=t('logout');
+  // Update nav items
+  const niSpans=document.querySelectorAll('.ni span');
+  const navKeys=['dashboard','nav_transactions','nav_budget','nav_debt','nav_subs','nav_reminders','nav_calculator','nav_income','nav_savings','nav_investments'];
+  niSpans.forEach((el,i)=>{if(navKeys[i])el.textContent=t(navKeys[i]);});
+  // Update month options
+  const monthSel=document.getElementById('month-sel');
+  if(monthSel){
+    Array.from(monthSel.options).forEach((opt,i)=>{opt.text=t('months')[i];});
+  }
+  // Save to profile
+  if(USER&&PROFILE){sb.from('profiles').update({lang}).eq('id',USER.id);}
+  // Re-render current page
+  const activePage=document.querySelector('.page.active');
+  if(activePage){
+    const id=activePage.id.replace('page-','');
+    const map={dashboard:renderDash,transactions:renderTx,budget:renderBudget,debt:renderDebt,subscriptions:renderSubs,reminders:renderReminders,income:renderIncome,savings:renderSavings,investments:renderInvestments};
+    if(map[id])map[id]();
+  }
 }
 
 // ══ SUPABASE LISTENER ══
