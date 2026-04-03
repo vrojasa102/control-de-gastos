@@ -89,7 +89,7 @@ nav{padding:16px 0;flex:1;overflow-y:auto;}
 /* METRICS */
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-bottom:22px;}
 .metric{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px 17px;}
-.ml{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
+.ml{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
 .mv{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1;}
 .mv.g{color:var(--accent);}.mv.r{color:var(--red);}.mv.a{color:var(--amber);}.mv.b{color:var(--blue);}.mv.p{color:var(--purple);}
 .msub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;}
@@ -288,12 +288,12 @@ tbody tr:hover{background:rgba(255,255,255,.018);}
   <div class="ph"><div><div class="pt" id="d-title">Dashboard</div><div class="ps" id="d-sub"></div></div></div>
   <div class="metrics" id="d-metrics"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
   <div class="g2" style="margin-bottom:14px;">
-    <div class="card"><div class="ct">Gastos por categoría</div><div id="d-exp-bars"></div></div>
-    <div class="card"><div class="ct">Balance anual</div><div style="position:relative;height:175px;"><canvas id="annual-chart"></canvas></div></div>
+    <div class="card"><div class="ct" id="ct-exp-cat">Gastos por categoría</div><div id="d-exp-bars"></div></div>
+    <div class="card"><div class="ct" id="ct-annual">Balance anual</div><div style="position:relative;height:175px;"><canvas id="annual-chart"></canvas></div></div>
   </div>
   <div class="g2">
-    <div class="card"><div class="ct">Próximos pagos</div><div id="d-upcoming"></div></div>
-    <div class="card"><div class="ct">Últimas transacciones</div><div class="tw"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Cat.</th><th style="text-align:right">Monto</th></tr></thead><tbody id="d-recent"></tbody></table></div></div>
+    <div class="card"><div class="ct" id="ct-upcoming">Próximos pagos</div><div id="d-upcoming"></div></div>
+    <div class="card"><div class="ct" id="ct-recent">Últimas transacciones</div><div class="tw"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Cat.</th><th style="text-align:right">Monto</th></tr></thead><tbody id="d-recent"></tbody></table></div></div>
   </div>
 </div>
 
@@ -712,6 +712,11 @@ function setLang(lang){
   if(monthSel){
     Array.from(monthSel.options).forEach((opt,i)=>{opt.text=t('months')[i];});
   }
+  // Update dashboard card titles
+  const ctExpCat=document.getElementById('ct-exp-cat');if(ctExpCat)ctExpCat.textContent=t('exp_by_cat');
+  const ctAnnual=document.getElementById('ct-annual');if(ctAnnual)ctAnnual.textContent=t('annual_balance');
+  const ctUpcoming=document.getElementById('ct-upcoming');if(ctUpcoming)ctUpcoming.textContent=t('upcoming');
+  const ctRecent=document.getElementById('ct-recent');if(ctRecent)ctRecent.textContent=t('recent_tx');
   // Save to profile
   if(USER&&PROFILE){sb.from('profiles').update({lang}).eq('id',USER.id);}
   // Re-render current page
@@ -791,16 +796,16 @@ async function renderDash(){
   const balance=allTimeInc-allTimeExp-totalDebt-totalSubs;
 
   document.getElementById('d-metrics').innerHTML=`
-    <div class="metric"><div class="ml">Ingresos</div><div class="mv g">${fmt(totalInc)}</div><div class="msub">${incs.length} registros</div></div>
-    <div class="metric"><div class="ml">Gastos</div><div class="mv b">${fmt(totalExp)}</div><div class="msub">${txs.length} transacciones</div></div>
-    <div class="metric"><div class="ml">Compromisos fijos</div><div class="mv r">${fmt(totalDebt+totalSubs)}</div><div class="msub">deudas + suscripciones</div></div>
-    <div class="metric"><div class="ml">Disponible</div><div class="mv ${balance>=0?'g':'r'}">${fmt(balance)}</div><div class="msub">saldo acumulado</div></div>`;
+    <div class="metric"><div class="ml">${t('metric_income')}</div><div class="mv g">${fmt(totalInc)}</div><div class="msub">${incs.length} ${t('metric_income_sub')}</div></div>
+    <div class="metric"><div class="ml">${t('metric_expenses')}</div><div class="mv b">${fmt(totalExp)}</div><div class="msub">${txs.length} ${t('metric_expenses_sub')}</div></div>
+    <div class="metric"><div class="ml">${t('metric_fixed')}</div><div class="mv r">${fmt(totalDebt+totalSubs)}</div><div class="msub">${t('metric_fixed_sub')}</div></div>
+    <div class="metric"><div class="ml">${t('metric_available')}</div><div class="mv ${balance>=0?'g':'r'}">${fmt(balance)}</div><div class="msub">${t('metric_available_sub')}</div></div>`;
 
   const catMap={};txs.forEach(t=>{catMap[t.category]=(catMap[t.category]||0)+t.amount;});
   const sorted=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
   const maxV=Math.max(...Object.values(catMap),1);
   document.getElementById('d-exp-bars').innerHTML=sorted.length?sorted.slice(0,6).map(([k,v])=>`
-    <div class="cbar"><div class="cbar-name">${k}</div><div class="cbar-bg"><div class="cbar-fill" style="width:${Math.round(v/maxV*100)}%;background:${catColorByName(k)};"></div></div><div class="cbar-val">${fmt(v)}</div></div>`).join(''):'<div class="empty">Sin gastos este mes</div>';
+    <div class="cbar"><div class="cbar-name">${k}</div><div class="cbar-bg"><div class="cbar-fill" style="width:${Math.round(v/maxV*100)}%;background:${catColorByName(k)};"></div></div><div class="cbar-val">${fmt(v)}</div></div>`).join(''):`<div class="empty">${t('no_expenses')}</div>`;
 
   // Annual chart
   const{data:allTxs}=await sb.from('transactions').select('amount,month').eq('user_id',USER.id);
@@ -826,14 +831,14 @@ async function renderDash(){
     ...subs.filter(s=>s.day&&s.reminder).map(s=>({name:s.name,amount:subMonthlyCost(s),daysLeft:s.day>=today?s.day-today:s.day+30-today})),
   ].sort((a,b)=>a.daysLeft-b.daysLeft).slice(0,5);
   document.getElementById('d-upcoming').innerHTML=upcoming.length?upcoming.map(p=>`
-    <div class="lrow"><div class="lrow-l"><div class="lrow-name">${p.name}</div><div class="lrow-sub">${p.daysLeft===0?'Hoy':p.daysLeft===1?'Mañana':'En '+p.daysLeft+' días'}</div></div>
-    <div style="font-family:var(--mono);font-size:13px;color:${p.daysLeft<=3?'var(--red)':'var(--amber)'}">${fmt(p.amount)}</div></div>`).join(''):'<div class="empty">Sin pagos próximos</div>';
+    <div class="lrow"><div class="lrow-l"><div class="lrow-name">${p.name}</div><div class="lrow-sub">${p.daysLeft===0?t('today'):p.daysLeft===1?t('tomorrow'):t('in_days')+' '+p.daysLeft+' '+t('days')}</div></div>
+    <div style="font-family:var(--mono);font-size:13px;color:${p.daysLeft<=3?'var(--red)':'var(--amber)'}">${fmt(p.amount)}</div></div>`).join(''):`<div class="empty">${t('no_upcoming')}</div>`;
 
   const recent=[...txs].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('d-recent').innerHTML=recent.length?recent.map(t=>`
     <tr><td style="font-family:var(--mono);color:var(--muted);font-size:11px;">${t.date?.slice(5)||''}</td><td>${t.description}</td>
     <td><span class="badge" style="background:${catColorByName(t.category)}25;color:${catColorByName(t.category)}">${t.category}</span></td>
-    <td style="text-align:right;font-family:var(--mono)">${fmt(t.amount)}</td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">Sin transacciones</div></td></tr>';
+    <td style="text-align:right;font-family:var(--mono)">${fmt(t.amount)}</td></tr>`).join(''):`<tr><td colspan="4"><div class="empty">${t('no_tx')}</div></td></tr>`;
 }
 
 // ══ TRANSACTIONS ══
@@ -1116,6 +1121,11 @@ async function addCatInline(){
   const cat=name.trim();
   if(CATS.includes(cat)){showToast('Ya existe esta categoría','err');return;}
   CATS.push(cat);
+  // Update dashboard card titles
+  const ctExpCat=document.getElementById('ct-exp-cat');if(ctExpCat)ctExpCat.textContent=t('exp_by_cat');
+  const ctAnnual=document.getElementById('ct-annual');if(ctAnnual)ctAnnual.textContent=t('annual_balance');
+  const ctUpcoming=document.getElementById('ct-upcoming');if(ctUpcoming)ctUpcoming.textContent=t('upcoming');
+  const ctRecent=document.getElementById('ct-recent');if(ctRecent)ctRecent.textContent=t('recent_tx');
   // Save to profile
   await sb.from('profiles').update({cats:CATS}).eq('id',USER.id);
   // Update all category selects
