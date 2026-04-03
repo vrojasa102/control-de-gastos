@@ -90,7 +90,7 @@ nav{padding:16px 0;flex:1;overflow-y:auto;}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-bottom:22px;}
 .metric{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px 17px;}
 .ml{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
-.mv{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1;}
+.mv{font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1;}
 .mv.g{color:var(--accent);}.mv.r{color:var(--red);}.mv.a{color:var(--amber);}.mv.b{color:var(--blue);}.mv.p{color:var(--purple);}
 .msub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;}
 
@@ -293,7 +293,7 @@ tbody tr:hover{background:rgba(255,255,255,.018);}
   </div>
   <div class="g2">
     <div class="card"><div class="ct" id="ct-upcoming">Próximos pagos</div><div id="d-upcoming"></div></div>
-    <div class="card"><div class="ct" id="ct-recent">Últimas transacciones</div><div class="tw"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Cat.</th><th style="text-align:right">Monto</th></tr></thead><tbody id="d-recent"></tbody></table></div></div>
+    <div class="card"><div class="ct" id="ct-recent">Últimas transacciones</div><div class="tw"><table><thead><tr><th id="th-date">Fecha</th><th id="th-desc">Descripción</th><th id="th-cat">Cat.</th><th id="th-amount" style="text-align:right">Monto</th></tr></thead><tbody id="d-recent"></tbody></table></div></div>
   </div>
 </div>
 
@@ -667,6 +667,8 @@ const T={
     today:'Hoy',tomorrow:'Mañana',in_days:'En',days:'días',
     months:['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Setiembre','Octubre','Noviembre','Diciembre'],
     monthly_sub:'resumen mensual',
+    th_date:'Fecha',th_desc:'Descripción',th_cat:'Cat.',th_amount:'Monto',
+    loading:'Cargando...',
   },
   en:{
     dashboard:'Dashboard',nav_transactions:'Transactions',nav_budget:'Budget',
@@ -683,6 +685,8 @@ const T={
     today:'Today',tomorrow:'Tomorrow',in_days:'In',days:'days',
     months:['January','February','March','April','May','June','July','August','September','October','November','December'],
     monthly_sub:'monthly summary',
+    th_date:'Date',th_desc:'Description',th_cat:'Cat.',th_amount:'Amount',
+    loading:'Loading...',
   }
 };
 const t=k=>T[LANG][k]||T['es'][k]||k;
@@ -712,6 +716,11 @@ function setLang(lang){
   if(monthSel){
     Array.from(monthSel.options).forEach((opt,i)=>{opt.text=t('months')[i];});
   }
+  // Update table headers
+  const thDate=document.getElementById('th-date');if(thDate)thDate.textContent=t('th_date');
+  const thDesc=document.getElementById('th-desc');if(thDesc)thDesc.textContent=t('th_desc');
+  const thCat=document.getElementById('th-cat');if(thCat)thCat.textContent=t('th_cat');
+  const thAmount=document.getElementById('th-amount');if(thAmount)thAmount.textContent=t('th_amount');
   // Update dashboard card titles
   const ctExpCat=document.getElementById('ct-exp-cat');if(ctExpCat)ctExpCat.textContent=t('exp_by_cat');
   const ctAnnual=document.getElementById('ct-annual');if(ctAnnual)ctAnnual.textContent=t('annual_balance');
@@ -768,9 +777,9 @@ function changeMonth(v){activeMonth=v;const p=document.querySelector('.page.acti
 
 // ══ DASHBOARD ══
 async function renderDash(){
-  document.getElementById('d-title').textContent=mName()+' '+(PROFILE?.year||2026);
-  document.getElementById('d-sub').textContent='Resumen mensual · '+ctry().currency;
-  document.getElementById('d-metrics').innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  document.getElementById('d-title').textContent=t('months')[activeMonth-1]+' '+(PROFILE?.year||2026);
+  document.getElementById('d-sub').textContent=t('monthly_sub')+' · '+ctry().currency;
+  document.getElementById('d-metrics').innerHTML='<div class="loading"><div class="spinner"></div>'+t('loading')+'</div>';
 
   if(!USER){return;}
   const[txsRes,incsRes,debtsRes,subsRes,allTxsRes,allIncsRes]=await Promise.all([
@@ -1121,6 +1130,11 @@ async function addCatInline(){
   const cat=name.trim();
   if(CATS.includes(cat)){showToast('Ya existe esta categoría','err');return;}
   CATS.push(cat);
+  // Update table headers
+  const thDate=document.getElementById('th-date');if(thDate)thDate.textContent=t('th_date');
+  const thDesc=document.getElementById('th-desc');if(thDesc)thDesc.textContent=t('th_desc');
+  const thCat=document.getElementById('th-cat');if(thCat)thCat.textContent=t('th_cat');
+  const thAmount=document.getElementById('th-amount');if(thAmount)thAmount.textContent=t('th_amount');
   // Update dashboard card titles
   const ctExpCat=document.getElementById('ct-exp-cat');if(ctExpCat)ctExpCat.textContent=t('exp_by_cat');
   const ctAnnual=document.getElementById('ct-annual');if(ctAnnual)ctAnnual.textContent=t('annual_balance');
