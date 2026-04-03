@@ -689,11 +689,13 @@ async function renderDash(){
   document.getElementById('d-metrics').innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
 
   if(!USER){return;}
-  const[txsRes,incsRes,debtsRes,subsRes]=await Promise.all([
+  const[txsRes,incsRes,debtsRes,subsRes,allTxsRes,allIncsRes]=await Promise.all([
     sb.from('transactions').select('*').eq('user_id',USER.id).eq('month',activeMonth),
     sb.from('income').select('*').eq('user_id',USER.id).eq('month',activeMonth),
     sb.from('debt').select('*').eq('user_id',USER.id),
     sb.from('subscriptions').select('*').eq('user_id',USER.id),
+    sb.from('transactions').select('amount').eq('user_id',USER.id),
+    sb.from('income').select('amount').eq('user_id',USER.id),
   ]);
   const txs=txsRes.data||[];
   const incs=incsRes.data||[];
@@ -704,13 +706,16 @@ async function renderDash(){
   const totalExp=txs.reduce((s,t)=>s+t.amount,0);
   const totalDebt=debts.reduce((s,d)=>s+d.monthly,0);
   const totalSubs=subs.reduce((s,sub)=>s+subMonthlyCost(sub),0);
-  const balance=totalInc-totalExp-totalDebt-totalSubs;
+
+  const allTimeInc=(allIncsRes.data||[]).reduce((s,i)=>s+i.amount,0);
+  const allTimeExp=(allTxsRes.data||[]).reduce((s,t)=>s+t.amount,0);
+  const balance=allTimeInc-allTimeExp-totalDebt-totalSubs;
 
   document.getElementById('d-metrics').innerHTML=`
     <div class="metric"><div class="ml">Ingresos</div><div class="mv g">${fmt(totalInc)}</div><div class="msub">${incs.length} registros</div></div>
     <div class="metric"><div class="ml">Gastos</div><div class="mv b">${fmt(totalExp)}</div><div class="msub">${txs.length} transacciones</div></div>
     <div class="metric"><div class="ml">Compromisos fijos</div><div class="mv r">${fmt(totalDebt+totalSubs)}</div><div class="msub">deudas + suscripciones</div></div>
-    <div class="metric"><div class="ml">Disponible</div><div class="mv ${balance>=0?'g':'r'}">${fmt(balance)}</div><div class="msub">después de todo</div></div>`;
+    <div class="metric"><div class="ml">Disponible</div><div class="mv ${balance>=0?'g':'r'}">${fmt(balance)}</div><div class="msub">saldo acumulado</div></div>`;
 
   const catMap={};txs.forEach(t=>{catMap[t.category]=(catMap[t.category]||0)+t.amount;});
   const sorted=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
